@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ScanPlate</title>
+<meta name="theme-color" content="#101418" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="topbar">
+    <div>
+      <h1>ScanPlate</h1>
+      <div class="tagline">Scan • Calories • Macros</div>
+    </div>
+  </div>
+
+  <!-- VUE SCAN -->
+  <section id="view-scan" class="view active">
+    <div class="shutter-wrap">
+      <label class="shutter" for="camera-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"/>
+          <circle cx="12" cy="13" r="3.4"/>
+        </svg>
+      </label>
+      <input id="camera-input" type="file" accept="image/*" capture="environment" />
+      <div class="shutter-label">Scanner mon assiette</div>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div id="result-card" class="result-card" style="display:none;">
+      <div class="dial">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="#2a3138" stroke-width="10"/>
+          <circle id="arc-protein" cx="50" cy="50" r="42" fill="none" stroke="var(--protein)" stroke-width="10" stroke-linecap="round"/>
+          <circle id="arc-carbs" cx="50" cy="50" r="42" fill="none" stroke="var(--carbs)" stroke-width="10" stroke-linecap="round"/>
+          <circle id="arc-fat" cx="50" cy="50" r="42" fill="none" stroke="var(--fat)" stroke-width="10" stroke-linecap="round"/>
+        </svg>
+        <div class="dial-center">
+          <div id="total-kcal" class="kcal mono">0</div>
+          <div class="kcal-label">kcal</div>
+        </div>
+      </div>
+
+      <div class="macro-legend">
+        <span><i class="dot protein"></i>Prot. <b id="total-protein" class="mono">0g</b></span>
+        <span><i class="dot carbs"></i>Gluc. <b id="total-carbs" class="mono">0g</b></span>
+        <span><i class="dot fat"></i>Lip. <b id="total-fat" class="mono">0g</b></span>
+      </div>
+
+      <div id="food-list" class="food-list"></div>
+    </div>
+  </section>
+
+  <!-- VUE HISTORIQUE -->
+  <section id="view-history" class="view">
+    <div id="history-list"></div>
+  </section>
+
+  <div class="tabbar">
+    <button id="tab-scan" class="active" data-view="view-scan">Scanner</button>
+    <button id="tab-history" data-view="view-history">Historique</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
