@@ -1,5 +1,4 @@
-// api/analyze.js — Analyse initiale d'une photo (équivalent GeminiVisionService.analyze)
-// La clé GEMINI_API_KEY reste côté serveur, jamais exposée au navigateur.
+// api/refine.js — Ré-analyse avec précisions utilisateur (équivalent GeminiVisionService.refine)
 
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
 
@@ -26,13 +25,32 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const { image } = req.body || {};
-  if (!image) {
-    res.status(400).send('Image manquante');
+  const { image, previousResult, fatType, hiddenSauce, adjustedGrams } = req.body || {};
+  if (!image || !previousResult) {
+    res.status(400).send('Paramètres manquants');
     return;
   }
 
-  const prompt = `Tu es un assistant nutritionnel. Analyse cette photo de plat et identifie chaque aliment visible avec une estimation de son poids en grammes. Calcule ensuite les calories, protéines, glucides et lipides pour chaque aliment, puis les totaux.
+  const extraInfoLines = [];
+  if (fatType) extraInfoLines.push(`- Matière grasse utilisée : ${fatType}`);
+  if (hiddenSauce) extraInfoLines.push(`- Sauce ou assaisonnement signalé : ${hiddenSauce}`);
+
+  (previousResult.foods || []).forEach((food, i) => {
+    const corrected = adjustedGrams ? adjustedGrams[i] : undefined;
+    if (corrected != null && Math.abs(corrected - food.estimatedGrams) > 0.5) {
+      extraInfoLines.push(`- "${food.name}" : poids réel ${Math.round(corrected)} g (estimation initiale : ${Math.round(food.estimatedGrams)} g)`);
+    }
+  });
+
+  const extraInfo = extraInfoLines.length ? extraInfoLines.join('\n') : 'Aucune précision supplémentaire fournie.';
+
+  const prompt = `Tu es un assistant nutritionnel. Tu as déjà analysé une première fois cette photo de plat, avec ce résultat :
+${JSON.stringify(previousResult)}
+
+L'utilisateur a maintenant fourni des précisions supplémentaires :
+${extraInfo}
+
+Recalcule une estimation plus précise en tenant compte de ces précisions. Si un poids réel est donné pour un aliment, utilise-le comme la valeur exacte (à la place de l'estimation initiale) et recalcule ses calories et macros proportionnellement à ce nouveau poids. Une matière grasse ajoute des calories et des lipides. Une sauce cachée ajoute des calories et peut devenir un aliment à part entière dans la liste si elle n'y figure pas déjà.
 
 ${JSON_FORMAT_INSTRUCTIONS}`;
 
@@ -40,7 +58,7 @@ ${JSON_FORMAT_INSTRUCTIONS}`;
     const result = await callGemini(apiKey, prompt, image);
     res.status(200).json(result);
   } catch (err) {
-    res.status(500).send(err.message || 'Erreur analyse Gemini');
+    res.status(500).send(err.message || 'Erreur affinage Gemini');
   }
 };
 
@@ -72,13 +90,9 @@ async function callGemini(apiKey, prompt, base64Image) {
   if (!rawText) throw new Error("Réponse Gemini vide ou invalide.");
 
   const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-  let parsed;
   try {
-    parsed = JSON.parse(cleaned);
+    return JSON.parse(cleaned);
   } catch {
     throw new Error("Impossible de lire l'analyse renvoyée par l'IA.");
   }
-  return parsed;
 }
-
-module.exports.callGemini = callGemini;
