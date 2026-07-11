@@ -17,6 +17,12 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* Règle de sécurité : sans elle, un élément avec l'attribut HTML `hidden`
+   ET une classe qui fixe `display: flex/block/...` (ex: .sheet-overlay,
+   .result-loading, .empty-state, .refined-tag) reste visible car la règle
+   de classe écrase le display:none par défaut de [hidden]. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   padding: 0;

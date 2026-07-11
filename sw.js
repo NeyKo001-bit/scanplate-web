@@ -2,7 +2,7 @@
 // IMPORTANT : incrémente CACHE_NAME à chaque nouvelle mise à jour déployée.
 // Ça force tous les appareils (y compris celui de ta mère) à récupérer les
 // nouveaux fichiers au lieu de rester bloqués sur une ancienne version en cache.
-const CACHE_NAME = 'scanplate-cache-v7';
+const CACHE_NAME = 'scanplate-cache-v8';
 
 const ASSETS = [
   './',
