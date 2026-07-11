@@ -1,82 +1,60 @@
-# ScanPlate — version web
+# ScanPlate — version web (fidèle à l'app iOS)
 
-Version web de ScanPlate : même principe que l'app iOS (photo → analyse
-Gemini → calories/macros → historique), mais utilisable sur **n'importe
-quel téléphone** (Android compris) via le navigateur, gratuitement,
-sans App Store ni Play Store.
+Cette version reproduit fidèlement le contenu de ton app Swift :
 
-## Déploiement (gratuit) avec Vercel
+- **Accueil** : même icône, même titre "Scanne ton assiette", même texte,
+  même bouton vert "Scanner mon assiette", même choix caméra / galerie.
+- **Résultat** : badge Calories (orange), puis Protéines/Glucides/Lipides
+  (rouge/bleu/jaune), liste des aliments détectés, bouton "Affiner le
+  résultat".
+- **Mode avancé (V2)** : feuille avec poids réel par aliment, matière
+  grasse utilisée, sauce cachée — recalcul via Gemini, exactement comme
+  `refine()` dans `GeminiVisionService.swift`.
+- **Historique cliquable (V3)** : on tape sur un scan passé pour le
+  rouvrir (sans relancer Gemini) et l'affiner à nouveau si besoin, avec
+  le badge "✓ Affiné".
+- Mêmes prompts envoyés à Gemini, même modèle (`gemini-3.1-flash-lite`),
+  même schéma JSON (`proteins`/`carbs`/`fats`, `totalCalories`, etc.).
 
-1. Crée un compte gratuit sur https://vercel.com (tu peux te connecter
-   avec GitHub).
-2. Mets ce dossier dans un dépôt GitHub :
-   - Crée un nouveau repo sur https://github.com/new (ex: `scanplate-web`)
-   - Depuis ce dossier, dans un terminal :
-     ```
-     git init
-     git add .
-     git commit -m "ScanPlate web"
-     git branch -M main
-     git remote add origin https://github.com/TON-USER/scanplate-web.git
-     git push -u origin main
-     ```
-3. Sur Vercel : **Add New → Project**, importe le repo `scanplate-web`.
-   Laisse les réglages par défaut (Vercel détecte automatiquement le
-   dossier `api/` comme des fonctions serverless).
-4. Avant de déployer, ajoute la variable d'environnement :
-   - Nom : `GEMINI_API_KEY`
-   - Valeur : ta clé API Gemini (celle que tu utilises déjà dans l'app iOS)
-   - (Project Settings → Environment Variables, puis redeploy)
-5. Déploie. Vercel te donne une URL du type
-   `https://scanplate-web.vercel.app`.
+La clé Gemini reste **cachée côté serveur** (`api/analyze.js` +
+variable d'environnement `GEMINI_API_KEY`), jamais visible dans le
+navigateur.
 
-C'est cette URL que tu donnes à ta mère (par SMS, WhatsApp, peu importe).
+## Mettre à jour ton déploiement existant
 
-> Alternative à Vercel : Netlify fonctionne pareil (fonctions serverless
-> gratuites + variables d'environnement). GitHub Pages, en revanche, ne
-> permet PAS les fonctions serverless — à éviter ici puisqu'on a besoin
-> de cacher la clé API côté serveur.
+Tu as déjà un projet Vercel connecté à un dépôt GitHub
+(`scanplate-web`). Pour remplacer l'ancienne version par celle-ci :
 
-## Installer comme une appli sur Android
+1. Va sur ton dépôt GitHub (`NeyKo001-bit/scanplate-web` d'après ton
+   screenshot).
+2. Pour chaque fichier de ce dossier (`index.html`, `style.css`,
+   `app.js`, `manifest.json`, `api/analyze.js`) :
+   - clique sur le fichier dans GitHub
+   - clique sur l'icône crayon ✏️ (Edit) en haut à droite
+   - sélectionne tout le contenu existant, supprime-le, colle le
+     nouveau contenu de ce dossier
+   - clique "Commit changes"
+   
+   Ou plus simple : sur la page principale du dépôt, bouton **"Add
+   file" → "Upload files"**, glisse tous les fichiers de ce dossier
+   (ça écrase automatiquement les fichiers du même nom).
+3. Vercel redéploie **automatiquement** dès qu'il détecte un
+   changement sur la branche `main` — pas besoin de repasser par
+   "New Project". Va dans l'onglet "Deployments" de ton projet Vercel
+   pour voir le nouveau déploiement se faire (30-60 secondes).
+4. Une fois "Ready", reteste sur `scanplate-web.vercel.app`.
 
-Une fois l'URL ouverte dans Chrome sur son téléphone :
-1. Menu **⋮** (trois points en haut à droite)
-2. **Ajouter à l'écran d'accueil** (ou "Installer l'application" si
-   Chrome le propose directement)
-3. Une icône ScanPlate apparaît sur l'écran d'accueil, s'ouvre en plein
-   écran sans barre d'adresse, exactement comme une appli installée.
+Ta clé `GEMINI_API_KEY` est déjà configurée sur Vercel, pas besoin d'y
+retoucher.
 
-Le fichier `manifest.json` + `sw.js` fournis sont justement là pour que
-cette installation fonctionne proprement (icône, nom, lancement en mode
-"standalone").
+## Ce qui reste différent de l'app iOS
 
-## Structure du projet
-
-```
-index.html        → structure de la page
-style.css          → design (cadran de calories/macros façon tableau de bord)
-app.js             → logique : capture photo, appel API, affichage, historique local
-manifest.json      → rend l'app installable sur Android
-sw.js              → service worker (mise en cache de la coquille de l'app)
-api/analyze.js     → fonction serverless qui appelle Gemini avec la clé API cachée
-icons/             → icônes de l'app
-```
-
-## Ce qui correspond à quoi côté iOS
-
-| iOS (Swift)              | Web                                   |
-|---------------------------|----------------------------------------|
-| `ImagePicker.swift`       | `<input type="file" capture="environment">` |
-| `GeminiVisionService.swift` | `api/analyze.js` (+ `fetch` dans `app.js`) |
-| `ScanHistoryStore.swift`  | `localStorage` dans `app.js`          |
-| `ScanResultView.swift`    | le "dial" de macros dans `index.html`/`style.css` |
-
-## Limites de cette V1 web (par rapport à l'app iOS)
-
-- Le mode "Affiner le résultat" (V2/V3 sur iOS) n'est pas encore repris
-  ici — seule l'analyse initiale est branchée. On peut l'ajouter ensuite
-  en suivant le même modèle (un second appel à `api/analyze.js` avec les
-  précisions de l'utilisateur).
-- L'historique est stocké en local dans le navigateur (`localStorage`) :
-  il est propre à chaque appareil, comme sur iOS (pas de compte, pas de
-  serveur qui garde les données).
+- Le rendu visuel s'appuie sur les polices système du téléphone
+  (`-apple-system` / Roboto selon l'appareil) plutôt que la police
+  exacte de Xcode — impossible à reproduire à l'identique en dehors
+  d'iOS, mais les couleurs, tailles et mises en page suivent celles du
+  code Swift.
+- L'historique est stocké dans le navigateur (`localStorage`), donc
+  propre à l'appareil, comme le `Documents` local sur iOS — mais s'il
+  vide le cache de son navigateur, l'historique est perdu (contrairement
+  à l'app iOS où seul un effacement d'app le supprimerait).

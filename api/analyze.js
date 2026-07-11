@@ -1,20 +1,51 @@
-// Fonction serverless Vercel.
-// Elle reçoit l'image du navigateur, appelle Gemini avec la clé API
-// stockée côté serveur (variable d'environnement GEMINI_API_KEY,
-// jamais exposée au client), et renvoie un résultat déjà parsé.
+// Reproduit GeminiVisionService.swift : mêmes prompts, même schéma JSON
+// (foods: name/estimatedGrams/calories/proteins/carbs/fats + totaux),
+// mais la clé Gemini reste ici, côté serveur (variable d'environnement
+// GEMINI_API_KEY), jamais envoyée au navigateur.
 
 const MODEL = "gemini-3.1-flash-lite";
 
-const PROMPT = `Tu es un nutritionniste expert. Analyse cette photo d'assiette.
-Identifie chaque aliment visible, estime son poids en grammes, ses calories,
-et ses macronutriments (protéines, glucides, lipides en grammes).
-Réponds UNIQUEMENT avec un JSON valide, sans texte autour, sans balises
-markdown, au format exact suivant :
+const JSON_FORMAT_INSTRUCTIONS = `Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises markdown, exactement dans ce format :
 {
   "foods": [
-    { "name": "string", "estimatedGrams": number, "calories": number, "protein": number, "carbs": number, "fat": number }
-  ]
+    {"name": "string", "estimatedGrams": number, "calories": number, "proteins": number, "carbs": number, "fats": number}
+  ],
+  "totalCalories": number,
+  "totalProteins": number,
+  "totalCarbs": number,
+  "totalFats": number
 }`;
+
+function analyzePrompt() {
+  return `Tu es un assistant nutritionnel. Analyse cette photo de plat et identifie chaque aliment visible avec une estimation de son poids en grammes. Calcule ensuite les calories, protéines, glucides et lipides pour chaque aliment, puis les totaux.
+
+${JSON_FORMAT_INSTRUCTIONS}`;
+}
+
+function refinePrompt(previousResult, answers) {
+  const extraInfoLines = [];
+  if (answers.fatType) extraInfoLines.push(`- Matière grasse utilisée : ${answers.fatType}`);
+  if (answers.hiddenSauce) extraInfoLines.push(`- Sauce ou assaisonnement signalé : ${answers.hiddenSauce}`);
+
+  for (const food of previousResult.foods || []) {
+    const corrected = answers.adjustedGrams ? answers.adjustedGrams[food.id] : undefined;
+    if (corrected !== undefined && Math.abs(corrected - food.estimatedGrams) > 0.5) {
+      extraInfoLines.push(`- "${food.name}" : poids réel ${Math.round(corrected)} g (estimation initiale : ${Math.round(food.estimatedGrams)} g)`);
+    }
+  }
+
+  const extraInfo = extraInfoLines.length ? extraInfoLines.join("\n") : "Aucune précision supplémentaire fournie.";
+
+  return `Tu es un assistant nutritionnel. Tu as déjà analysé une première fois cette photo de plat, avec ce résultat :
+${JSON.stringify(previousResult)}
+
+L'utilisateur a maintenant fourni des précisions supplémentaires :
+${extraInfo}
+
+Recalcule une estimation plus précise en tenant compte de ces précisions. Si un poids réel est donné pour un aliment, utilise-le comme la valeur exacte (à la place de l'estimation initiale) et recalcule ses calories et macros proportionnellement à ce nouveau poids. Une matière grasse ajoute des calories et des lipides. Une sauce cachée ajoute des calories et peut devenir un aliment à part entière dans la liste si elle n'y figure pas déjà.
+
+${JSON_FORMAT_INSTRUCTIONS}`;
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -29,13 +60,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { imageBase64, mimeType, refinementNote } = req.body || {};
+    const { mode, imageBase64, mimeType, previousResult, refinementAnswers } = req.body || {};
     if (!imageBase64 || !mimeType) {
       res.status(400).json({ error: "Image manquante." });
       return;
     }
 
-    const promptText = refinementNote ? `${PROMPT}\n\nPrécisions données par l'utilisateur à prendre en compte : ${refinementNote}` : PROMPT;
+    const prompt = mode === "refine"
+      ? refinePrompt(previousResult || { foods: [] }, refinementAnswers || {})
+      : analyzePrompt();
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
@@ -44,13 +77,9 @@ export default async function handler(req, res) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [
-            {
-              parts: [
-                { text: promptText },
-                { inline_data: { mime_type: mimeType, data: imageBase64 } }
-              ]
-            }
-          ]
+            { parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: imageBase64 } }] }
+          ],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1024 }
         })
       }
     );
@@ -69,7 +98,7 @@ export default async function handler(req, res) {
     try {
       parsed = JSON.parse(text);
     } catch {
-      res.status(502).json({ error: "Réponse Gemini illisible.", raw: text });
+      res.status(502).json({ error: "Impossible de lire l'analyse renvoyée par l'IA.", raw: text });
       return;
     }
 
@@ -78,22 +107,18 @@ export default async function handler(req, res) {
       name: f.name,
       estimatedGrams: f.estimatedGrams || 0,
       calories: f.calories || 0,
-      protein: f.protein || 0,
+      proteins: f.proteins || 0,
       carbs: f.carbs || 0,
-      fat: f.fat || 0
+      fats: f.fats || 0
     }));
 
-    const totals = foods.reduce(
-      (acc, f) => ({
-        calories: acc.calories + f.calories,
-        protein: acc.protein + f.protein,
-        carbs: acc.carbs + f.carbs,
-        fat: acc.fat + f.fat
-      }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0 }
-    );
-
-    res.status(200).json({ foods, totals });
+    res.status(200).json({
+      foods,
+      totalCalories: parsed.totalCalories || 0,
+      totalProteins: parsed.totalProteins || 0,
+      totalCarbs: parsed.totalCarbs || 0,
+      totalFats: parsed.totalFats || 0
+    });
   } catch (err) {
     res.status(500).json({ error: err.message || "Erreur serveur." });
   }

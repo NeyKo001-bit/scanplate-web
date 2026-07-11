@@ -4,70 +4,141 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>ScanPlate</title>
-<meta name="theme-color" content="#101418" />
+<meta name="theme-color" content="#ffffff" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="icon" href="icons/icon-192.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div class="topbar">
-    <div>
-      <h1>ScanPlate</h1>
-      <div class="tagline">Scan • Calories • Macros</div>
+  <!-- ===== ÉCRAN ACCUEIL (= HomeView.swift) ===== -->
+  <section id="screen-home" class="screen active">
+    <header class="nav-bar"><h1>Accueil</h1></header>
+    <div class="home-content">
+      <div class="home-icon">🍽️</div>
+      <h2 class="home-title">Scanne ton assiette</h2>
+      <p class="home-subtitle">Prends une photo de ton plat pour estimer les calories et les macros en quelques secondes.</p>
+      <div class="spacer"></div>
+      <button id="btn-scan" class="btn-primary">
+        <span class="icon">📷</span> Scanner mon assiette
+      </button>
     </div>
-  </div>
+  </section>
 
-  <!-- VUE SCAN -->
-  <section id="view-scan" class="view active">
-    <div class="shutter-wrap">
-      <label class="shutter" for="camera-input">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-          <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"/>
-          <circle cx="12" cy="13" r="3.4"/>
-        </svg>
-      </label>
-      <input id="camera-input" type="file" accept="image/*" capture="environment" />
-      <div class="shutter-label">Scanner mon assiette</div>
-    </div>
+  <!-- ===== ÉCRAN RÉSULTAT (= ScanResultView.swift) ===== -->
+  <section id="screen-result" class="screen">
+    <header class="nav-bar">
+      <button id="btn-back" class="nav-back">‹ Retour</button>
+      <h1 id="result-title">Résultat</h1>
+    </header>
+    <div class="result-content">
+      <img id="result-photo" class="result-photo" alt="Photo du plat" />
 
-    <div id="status" class="status"></div>
+      <div id="loading-state" class="state-block" style="display:none;">
+        <div class="spinner"></div>
+        <p>Analyse en cours...</p>
+      </div>
 
-    <div id="result-card" class="result-card" style="display:none;">
-      <div class="dial">
-        <svg viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="42" fill="none" stroke="#2a3138" stroke-width="10"/>
-          <circle id="arc-protein" cx="50" cy="50" r="42" fill="none" stroke="var(--protein)" stroke-width="10" stroke-linecap="round"/>
-          <circle id="arc-carbs" cx="50" cy="50" r="42" fill="none" stroke="var(--carbs)" stroke-width="10" stroke-linecap="round"/>
-          <circle id="arc-fat" cx="50" cy="50" r="42" fill="none" stroke="var(--fat)" stroke-width="10" stroke-linecap="round"/>
-        </svg>
-        <div class="dial-center">
-          <div id="total-kcal" class="kcal mono">0</div>
-          <div class="kcal-label">kcal</div>
+      <div id="error-state" class="state-block" style="display:none;">
+        <div class="error-icon">⚠️</div>
+        <p id="error-text" class="error-text"></p>
+        <button id="btn-retry" class="btn-secondary">Réessayer</button>
+      </div>
+
+      <div id="result-body" style="display:none;">
+        <div id="refined-badge" class="refined-badge" style="display:none;">✓ Résultat affiné</div>
+
+        <div class="badge badge-calories">
+          <div id="v-calories" class="badge-value">0</div>
+          <div class="badge-unit">kcal</div>
+          <div class="badge-label">Calories</div>
+        </div>
+
+        <div class="badge-row">
+          <div class="badge badge-protein">
+            <div id="v-proteins" class="badge-value">0</div>
+            <div class="badge-unit">g</div>
+            <div class="badge-label">Protéines</div>
+          </div>
+          <div class="badge badge-carbs">
+            <div id="v-carbs" class="badge-value">0</div>
+            <div class="badge-unit">g</div>
+            <div class="badge-label">Glucides</div>
+          </div>
+          <div class="badge badge-fats">
+            <div id="v-fats" class="badge-value">0</div>
+            <div class="badge-unit">g</div>
+            <div class="badge-label">Lipides</div>
+          </div>
+        </div>
+
+        <h3 class="section-title">Détail des aliments</h3>
+        <div id="food-list"></div>
+
+        <div class="refine-section">
+          <button id="btn-refine" class="btn-outline">🎚️ Affiner le résultat</button>
+          <p id="refine-error" class="error-text small" style="display:none;"></p>
         </div>
       </div>
-
-      <div class="macro-legend">
-        <span><i class="dot protein"></i>Prot. <b id="total-protein" class="mono">0g</b></span>
-        <span><i class="dot carbs"></i>Gluc. <b id="total-carbs" class="mono">0g</b></span>
-        <span><i class="dot fat"></i>Lip. <b id="total-fat" class="mono">0g</b></span>
-      </div>
-
-      <div id="food-list" class="food-list"></div>
     </div>
   </section>
 
-  <!-- VUE HISTORIQUE -->
-  <section id="view-history" class="view">
-    <div id="history-list"></div>
+  <!-- ===== ÉCRAN HISTORIQUE (= HistoryView.swift) ===== -->
+  <section id="screen-history" class="screen">
+    <header class="nav-bar"><h1>Historique</h1></header>
+    <div id="history-list" class="history-content"></div>
   </section>
 
-  <div class="tabbar">
-    <button id="tab-scan" class="active" data-view="view-scan">Scanner</button>
-    <button id="tab-history" data-view="view-history">Historique</button>
+  <!-- ===== BARRE D'ONGLETS (= TabView) ===== -->
+  <nav class="tabbar">
+    <button id="tab-scan" class="tab-btn active" data-target="screen-home">
+      <span class="tab-icon">📷</span>Scanner
+    </button>
+    <button id="tab-history" class="tab-btn" data-target="screen-history">
+      <span class="tab-icon">🕓</span>Historique
+    </button>
+  </nav>
+
+  <!-- ===== FEUILLE : choix caméra / galerie (= confirmationDialog) ===== -->
+  <div id="source-sheet" class="sheet-overlay">
+    <div class="sheet">
+      <div class="sheet-title">Choisir une photo</div>
+      <label class="sheet-btn" for="input-camera">Prendre une photo</label>
+      <label class="sheet-btn" for="input-gallery">Choisir depuis la galerie</label>
+      <button id="btn-cancel-source" class="sheet-btn sheet-cancel">Annuler</button>
+    </div>
+  </div>
+  <input id="input-camera" type="file" accept="image/*" capture="environment" hidden />
+  <input id="input-gallery" type="file" accept="image/*" hidden />
+
+  <!-- ===== FEUILLE : Affiner le résultat (= refinementSheet) ===== -->
+  <div id="refine-sheet" class="sheet-overlay">
+    <div class="sheet sheet-form">
+      <div class="sheet-header">
+        <button id="btn-cancel-refine" class="sheet-header-btn">Annuler</button>
+        <div class="sheet-header-title">Affiner le résultat</div>
+        <button id="btn-confirm-refine" class="sheet-header-btn sheet-header-btn-primary">Recalculer</button>
+      </div>
+      <div class="sheet-body">
+        <p class="form-hint">Ces précisions sont optionnelles et permettent d'affiner l'estimation. Corrige uniquement ce que tu connais.</p>
+
+        <div class="form-section">
+          <div class="form-section-title">Poids réels (en grammes)</div>
+          <div id="refine-grams-list"></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Matière grasse utilisée</div>
+          <div id="refine-fat-options" class="fat-options"></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Sauce ou assaisonnement caché</div>
+          <input id="refine-sauce" type="text" placeholder="Ex : sauce curry, vinaigrette..." class="text-input" />
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
